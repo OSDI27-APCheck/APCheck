@@ -16,7 +16,7 @@ This repository provides the implementation of APCheck and several state-of-the-
 
 - **APCheck:** Adaptive Partitioned Checkpointing.
 - **APCheck-S:** Selective Partition Snapshot Elimination.
-- **APCheck-(S+C):** APCheck with Selective Partition Snapshot Elimination and Sparsity-Aware Partition Compression.
+- **APCheck-(S+C):** Sparsity-Aware Partition Compression.
 
 ### State-of-the-Art Checkpointing Systems
 We implement and integrate the following state-of-the-art checkpointing systems for comparison:
@@ -30,10 +30,10 @@ We implement and integrate the following state-of-the-art checkpointing systems 
 
 # Implementation
 APCheck employs a decoupled and hierarchical storage design for efficient checkpointing. Its implementation consists of four major modules:
-1. **Adaptive Partitioned Snapshotting:** Profiles runtime PCIe bandwidth utilization and dynamically adjusts checkpoint partition sizes to mitigate bandwidth contention and improve bandwidth utilization.
-2. **Selective Partition Snapshot Elimination:** Identifies partitions with fully sparse differentials and skips unnecessary snapshotting operations to reduce GPU-to-CPU data transfer overhead.
-3. **Sparsity-Aware Partition Compression:** Adjusts compression ratios according to partition-level differential sparsity to improve compression efficiency and reduce persistence I/O overhead.
-4. **Failure Recovery:** Recovers training states from persisted checkpoints after failures.
+1. **Adaptive Partitioned Snapshotting Module:** Profiles runtime PCIe bandwidth utilization and dynamically adjusts checkpoint partition sizes to mitigate bandwidth contention and improve bandwidth utilization.
+2. **Selective Partition Snapshot Elimination Module:** Identifies partitions with fully sparse differentials and skips unnecessary snapshotting operations to reduce GPU-to-CPU data transfer overhead.
+3. **Sparsity-Aware Partition Compression Module:** Adjusts compression ratios according to partition-level differential sparsity to improve compression efficiency and reduce persistence I/O overhead.
+4. **Failure Recovery Module:** Recovers training states from persisted checkpoints after failures.
 
 ## APCheck System Architecture
 The overall system architecture of APCheck is illustrated below.
