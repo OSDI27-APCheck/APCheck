@@ -1,103 +1,112 @@
-# APCheck: Low-Overhead Checkpointing via Adaptive Partitioning for Distributed Large Language Model Training
+# APCheck: Adaptive Partitioned Checkpointing for Distributed Large Language Model Training
 
-**APCheck** is an asymmetric partitioned checkpointing mechanism that adjusts partition sizes for efficient LLM training, using smaller partitions for forward passes and larger partitions for backward passes.
-Further, **APCheck** incorporates two key techniques: (i) a selective partition compression scheme to reduce checkpoint size with low compression overhead and (ii) a batched flushing mechanism to minimize persistence latency.
+**APCheck** is an adaptive partitioned checkpointing framework designed to reduce checkpointing overhead in distributed large language model (LLM) training. Existing checkpointing systems typically employ static partitioning, using predefined partition sizes throughout each training pass. However, PCIe bandwidth utilization varies substantially at runtime, making static partitioning inefficient. Large partitions can cause bandwidth contention under high PCIe utilization, while small partitions fail to fully utilize available bandwidth under low utilization. To address these limitations, **APCheck dynamically adjusts checkpoint partition sizes according to runtime PCIe bandwidth utilization**, using smaller partitions under high utilization and larger partitions under low utilization to improve checkpointing efficiency and reduce training stalls.
+
+Furthermore, APCheck incorporates two optimization techniques:
+- **Selective Partition Snapshot Elimination:** Skips snapshotting for partitions with fully sparse differentials, reducing GPU-to-CPU snapshotting overhead.
+- **Sparsity-Aware Partition Compression:** Dynamically adjusts compression ratios according to partition-level differential sparsity, improving compression efficiency and reducing persistence I/O overhead.
+
+Experiments on local and cloud clusters with representative LLMs demonstrate that APCheck reduces training time by up to **32.14%** and checkpointing time by up to **74.06%** compared with state-of-the-art checkpointing systems, while maintaining training accuracy close to the no-checkpoint baseline.
 
 # Introduction
-This code repository covers:
+This repository provides the implementation of APCheck and several state-of-the-art checkpointing systems for distributed LLM training. It also includes scripts for reproducing the experiments presented in our paper.
 
-### __SAFusion Framework__
-- APCheck(Naive): Asymmetric Partitioned Snapshotting
-- APCheck-S: Selective Partition Compression
-- APCheck-(S+O): Optimal Batched Flushing
+## Checkpointing Frameworks
+### APCheck
 
-### __State-of-the-art tensor fusion schemes__
+- **APCheck:** Adaptive Partitioned Checkpointing.
+- **APCheck-S:** Selective Partition Snapshot Elimination.
+- **APCheck-(S+C):** APCheck with Selective Partition Snapshot Elimination and Sparsity-Aware Partition Compression.
 
-- [PCcheck](https://github.com/eth-easl/pccheck)
+### State-of-the-Art Checkpointing Systems
+We implement and integrate the following state-of-the-art checkpointing systems for comparison:
+
+- [PCCheck](https://github.com/eth-easl/pccheck)
 - [DataStates-LLM](https://github.com/DataStates/datastates-llm)
 - [Gemini](https://github.com/DAC26-APCheck/APCheck/tree/main/gemini)
 - [CheckFreq](https://github.com/msr-fiddle/CheckFreq)
 - [AsymCheck](https://github.com/zqming-cs/AsymCheck)
-- [EXcp](https://github.com/Gaffey/ExCP)
-
+- [ExCP](https://github.com/Gaffey/ExCP)
 
 # Implementation
+APCheck employs a decoupled and hierarchical storage design for efficient checkpointing. Its implementation consists of four major modules:
+1. **Adaptive Partitioned Snapshotting:** Profiles runtime PCIe bandwidth utilization and dynamically adjusts checkpoint partition sizes to mitigate bandwidth contention and improve bandwidth utilization.
+2. **Selective Partition Snapshot Elimination:** Identifies partitions with fully sparse differentials and skips unnecessary snapshotting operations to reduce GPU-to-CPU data transfer overhead.
+3. **Sparsity-Aware Partition Compression:** Adjusts compression ratios according to partition-level differential sparsity to improve compression efficiency and reduce persistence I/O overhead.
+4. **Failure Recovery:** Recovers training states from persisted checkpoints after failures.
 
+## APCheck System Architecture
+The overall system architecture of APCheck is illustrated below.
 
-**APCheck** employs a decoupled and hierarchical storage design for checkpointing and consists of four modules:
-
-1. An asymmetric partitioned snapshotting module
-2. A selective partition compression module
-3. An optimal batched flushing module
-4. A failure recovery module
-
-## **__APCheck__** System Architecture
-
-The system architecture of **APCheck** is as follows: 
-
-<center class ='img'>
+<center class='img'>
 <img src="checkpoint_workflow_.png" width="700px" />
 </center>
 
-
 # Installation
-
-## **Prerequisites**
+## Prerequisites
+The following software dependencies are required:
 - Python >= 3.12
-- PyTorch-1.3.+
-- CUDA-12.6
-- DeepSpeed-0.14.5 
-- NCCL-2.20.5 
-- Hadoop-3.3.6
-- Huggingface-0.24.6
+- PyTorch >= 1.3
+- CUDA 12.6
+- DeepSpeed 0.14.5
+- NCCL 2.20.5
+- Hadoop 3.3.6
+- Hugging Face Transformers 0.24.6
 
+## Get the Code
 
-## **Get the code**
-``` shell
+Clone the repository and install the dependencies:
+```shell
 git clone https://github.com/DAC26-APCheck/APCheck
 cd APCheck
 pip install -r requirements.txt
 python setup.py
 ```
-If pip installation fails, please try to upgrade pip via `pip install --upgrade pip`. If [DeepSpeed](https://github.com/deepspeedai/DeepSpeed) installation with NCCL failed, please check the installation [guide](https://www.deepspeed.ai/).
 
+If the pip installation fails, try upgrading pip:
 
-## **Quick start**
-We provide codes for seven types of checkpointing solutions. They are ExCP, DataStates-LLM, PCcheck, Gemini, CheckFreq, and APCheck. For each method, there are codes for six models, which are GPT2, BERT, RoBERT, BLOOM, ResNet, and ViT.
+```shell
+pip install --upgrade pip
+```
 
-For example, to run GPT2 10B, BERT 10B, RoBERT 10B, BLOOM 10B with APCheck:
+If DeepSpeed installation with NCCL fails, please refer to the [DeepSpeed installation guide](https://www.deepspeed.ai/).
 
-**To run GPT2 10B, BERT 10B, RoBERT 10B, BLOOM 10B training job:**
-``` shell
+# Quick Start
+
+We provide implementations of six checkpointing solutions: ExCP, DataStates-LLM, PCCheck, Gemini, CheckFreq, and APCheck.
+For each checkpointing solution, we provide training scripts for six representative models: GPT-2, BERT, RoBERTa, BLOOM, ResNet, and ViT.
+The following examples demonstrate how to launch 10B-scale LLM training jobs using APCheck.
+
+### GPT-2 10B
+
+```shell
 cd APCheck/example/llm/gpt2
 bash run_clm_no_trainer_ds_gpt2_layer_10B_asym.sh
 ```
 
-**To run BERT 10B training job:**
-``` shell
+### BERT 10B
+
+```shell
 cd APCheck/example/llm/bert
 bash run_squad_ds_z3_bert_10B_asym.sh
 ```
 
-**To run Roberta 10B training job:**
-``` shell
+### RoBERTa 10B
+
+```shell
 cd APCheck/example/llm/roberta
 bash run_mlm_no_trainer_roberta_ds_asym.sh
 ```
 
-**To run Bloom 10B training job:**
-``` shell
+### BLOOM 10B
+
+```shell
 cd APCheck/example/llm/bloom
 bash run_clm_no_trainer_bloom_ds_asym.sh
 ```
 
-
-
-## **Referred Datasets**
-
-- Wikitex-103/2: [https://huggingface.co/datasets/wikitext](https://huggingface.co/datasets/wikitext)
-- SQuAD: [https://rajpurkar.github.io/SQuAD-explorer/](https://rajpurkar.github.io/SQuAD-explorer/)
-- ImageNet: [https://www.image-net.org/](https://www.image-net.org/)
-
-
-
+# Datasets
+The following datasets are used in our experiments:
+- **WikiText-103/2:** [Hugging Face WikiText](https://huggingface.co/datasets/wikitext)
+- **SQuAD:** [Stanford Question Answering Dataset](https://rajpurkar.github.io/SQuAD-explorer/)
+- **ImageNet:** [ImageNet](https://www.image-net.org/)
